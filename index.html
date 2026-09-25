@@ -64,6 +64,7 @@
     .btn-audio { background-color: #ffca28; color: #333; }
     .btn-mic { background-color: #42a5f5; color: #fff; }
     .btn-stop { background-color: #ef5350; color: #fff; display: none; }
+    .btn-check { background-color: #00e676; color: #333; display: none; }
     .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
     .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
     .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
@@ -104,6 +105,7 @@
     <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Dengar Contoh</button>
     <button id="btnMic" class="btn btn-mic" onclick="mulaiMerekam()">🎙️ Mulai Baca</button>
     <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Selesai Bicara</button>
+    <button id="btnCheck" class="btn btn-check" onclick="paksaEvaluasi()">✅ Cek Jawaban Saya</button>
     <button id="btnPlayUser" class="btn btn-play-user" onclick="putarRekamanUser()">🎧 Putar Suara Saya</button>
   </div>
 
@@ -126,6 +128,7 @@
   let audioChunks = [];
   let userAudioUrl = null;
   let isEvaluated = false;
+  let suaraTerakhir = "";
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
@@ -143,18 +146,20 @@
       }
       
       if (hasilSuara.trim() !== "") {
+        suaraTerakhir = hasilSuara.trim();
         document.getElementById("detectedText").style.display = "block";
-        document.getElementById("detectedText").innerText = `Terdengar: "${hasilSuara}"`;
+        document.getElementById("detectedText").innerText = `Terdengar: "${suaraTerakhir}"`;
+        document.getElementById("btnCheck").style.display = "inline-block";
         
-        // Penilaian otomatis
-        evaluasiJawabanRealtime(hasilSuara);
+        // Evaluasi Otomatis Real-time
+        evaluasiJawaban(suaraTerakhir);
       }
     };
 
     recognition.onerror = function() {
-      if (!isEvaluated) {
+      if (!isEvaluated && suaraTerakhir === "") {
         hentikanMerekamManual();
-        tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
+        tampilkanStatus("❌ Suara tidak terdeteksi. Klik 'Mulai Baca' lalu bersuara lebih jelas!", false);
       }
     };
 
@@ -162,7 +167,7 @@
       stopAudioRecording();
     };
   } else {
-    alert("Gunakan Google Chrome untuk dukungan deteksi suara!");
+    alert("Gunakan Google Chrome untuk dukungan penuh deteksi suara!");
   }
 
   async function muatSoal(level, mode) {
@@ -171,6 +176,7 @@
     document.getElementById("detectedText").style.display = "none";
     document.getElementById("btnPlayUser").style.display = "none";
     document.getElementById("btnStop").style.display = "none";
+    document.getElementById("btnCheck").style.display = "none";
     
     try {
       const response = await fetch(`${API_URL}?level=${level}&mode=${mode}`, {
@@ -197,6 +203,9 @@
   function tampilkanSoal() {
     if (soalList.length === 0) return;
     
+    suaraTerakhir = "";
+    isEvaluated = false;
+    
     const target = soalList[currentIndex];
     const displayBox = document.getElementById("wordDisplay");
     displayBox.innerText = target.teks;
@@ -205,6 +214,7 @@
     document.getElementById("levelBadge").innerText = `Level ${target.level}`;
     document.getElementById("btnPlayUser").style.display = "none";
     document.getElementById("btnStop").style.display = "none";
+    document.getElementById("btnCheck").style.display = "none";
     document.getElementById("btnMic").style.display = "inline-block";
     
     if (currentMode === "mencoba") {
@@ -238,13 +248,15 @@
     if (!recognition) return;
     
     isEvaluated = false;
+    suaraTerakhir = "";
     audioChunks = [];
     document.getElementById("detectedText").style.display = "none";
     document.getElementById("btnPlayUser").style.display = "none";
+    document.getElementById("btnCheck").style.display = "none";
     document.getElementById("btnMic").style.display = "none";
     document.getElementById("btnStop").style.display = "inline-block";
     
-    tampilkanStatus("🎙️ Mendengarkan... Bicara sekarang!", true);
+    tampilkanStatus("🎙️ Mendengarkan... Ucapkan hurufnya!", true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -269,11 +281,23 @@
     document.getElementById("btnStop").style.display = "none";
     if (recognition) recognition.stop();
     stopAudioRecording();
+    
+    if (suaraTerakhir !== "" && !isEvaluated) {
+      evaluasiJawaban(suaraTerakhir);
+    }
   }
 
   function stopAudioRecording() {
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
+    }
+  }
+
+  function paksaEvaluasi() {
+    if (suaraTerakhir !== "") {
+      evaluasiJawaban(suaraTerakhir);
+    } else {
+      tampilkanStatus("❌ Suara belum terdeteksi. Tekan Mulai Baca dan sebut hurufnya!", false);
     }
   }
 
@@ -284,20 +308,20 @@
     }
   }
 
-  // Evaluasi Otomatis
-  function evaluasiJawabanRealtime(jawabanSuara) {
+  // Evaluasi Jawaban & Progres
+  function evaluasiJawaban(jawabanSuara) {
     if (isEvaluated) return;
 
     const targetAwal = soalList[currentIndex].teks.toLowerCase().trim();
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    // Pengecekan kecocokan bacaan
+    // Pengecekan kecocokan bacaan anak
     if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
       isEvaluated = true;
       hentikanMerekamManual();
 
-      // Jawaban BENAR -> Beri respon & Otomatis Pindah Soal
+      // Jawaban BENAR -> Beri tanda hijau & OTOMATIS LANJUT ke soal berikutnya
       const displayBox = document.getElementById("wordDisplay");
       displayBox.classList.add("correct-anim");
       tampilkanStatus("✅ BETUL! PINTAR!", true);
@@ -315,8 +339,8 @@
       }, 1200);
 
     } else {
-      // Jawaban SALAH -> Tidak Pindah Soal, Minta Ulang
-      tampilkanStatus("❌ BELUM TEPAT! AYO COBA LAGI!", false);
+      // Jawaban SALAH -> Tetap di soal ini, tidak bisa lanjut!
+      tampilkanStatus(`❌ Terdengar "${jawabanSuara}". BELUM TEPAT! COBA LAGI!`, false);
       if (currentMode === "mencoba") {
         setTimeout(() => putarAudioContoh(), 1000);
       } else {
