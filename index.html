@@ -62,20 +62,25 @@
     }
     .btn-audio { background-color: #ffca28; color: #333; }
     .btn-mic { background-color: #42a5f5; color: #fff; }
+    .btn-stop { background-color: #ef5350; color: #fff; display: none; }
     .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
     .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
     .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
     .status-text {
       margin-top: 15px;
       font-weight: bold;
-      min-height: 24px;
-      font-size: 1.1rem;
+      min-height: 28px;
+      font-size: 1.2rem;
     }
     .detected-text {
-      font-size: 0.95rem;
-      color: #555;
-      margin-top: 5px;
+      font-size: 1rem;
+      color: #333;
+      margin-top: 8px;
       font-style: italic;
+      background: #f1f8e9;
+      padding: 8px;
+      border-radius: 10px;
+      display: none;
     }
     .success { color: #2e7d32; }
     .error { color: #c62828; }
@@ -92,6 +97,7 @@
   <div id="actionArea">
     <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Dengar Contoh</button>
     <button id="btnMic" class="btn btn-mic" onclick="mulaiMerekam()">🎙️ Mulai Baca</button>
+    <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Selesai Bicara</button>
     <button id="btnPlayUser" class="btn btn-play-user" onclick="putarRekamanUser()">🎧 Putar Suara Saya</button>
   </div>
 
@@ -103,6 +109,7 @@
 </div>
 
 <script>
+  // API URL Web App Google Apps Script
   const API_URL = "https://script.google.com/macros/s/AKfycbz8WB0yTgZ1-vAO2hjVIAmBotDQ7tZ36TX63IRc-xcaRvkC4x5cXajHHfGs7mjwSCSB1g/exec";
   
   let currentLevel = 1;
@@ -110,12 +117,13 @@
   let soalList = [];
   let currentIndex = 0;
   
-  // Variabel Rekaman Suara
+  // Rekaman Suara Audio Physical
   let mediaRecorder;
   let audioChunks = [];
   let userAudioUrl = null;
+  let isEvaluated = false;
 
-  // Inisialisasi Speech Recognition
+  // Web Speech Recognition
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
   
@@ -123,31 +131,45 @@
     recognition = new SpeechRecognition();
     recognition.lang = 'id-ID';
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true; // Tangkap hasil sementara
     
     recognition.onresult = function(event) {
-      const hasilSuara = event.results[0][0].transcript;
-      evaluasiJawaban(hasilSuara);
+      let hasilSementara = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        hasilSementara += event.results[i][0].transcript;
+      }
+      
+      if (hasilSementara.trim() !== "") {
+        document.getElementById("detectedText").style.display = "block";
+        document.getElementById("detectedText").innerText = `Terdengar: "${hasilSementara}"`;
+      }
+
+      if (event.results[0].isFinal) {
+        prosesEvaluasi(hasilSementara);
+      }
     };
 
     recognition.onerror = function(e) {
-      stopAudioRecording();
-      tampilkanStatus("❌ Suara tidak terdeteksi. Silakan coba klik 'Mulai Baca' lagi!", false);
+      if (!isEvaluated) {
+        hentikanMerekamManual();
+        tampilkanStatus("❌ Suara tidak terdeteksi. Klik 'Mulai Baca' lalu ucapkan dengan jelas!", false);
+      }
     };
 
     recognition.onend = function() {
       stopAudioRecording();
     };
   } else {
-    alert("Gunakan Google Chrome untuk dukungan deteksi suara!");
+    alert("Gunakan Google Chrome untuk dukungan penuh deteksi suara!");
   }
 
-  // Mengambil Data Soal
+  // Ambil Data dari Sheets
   async function muatSoal(level, mode) {
     document.getElementById("wordDisplay").innerText = "Memuat...";
     document.getElementById("statusText").innerText = "";
-    document.getElementById("detectedText").innerText = "";
+    document.getElementById("detectedText").style.display = "none";
     document.getElementById("btnPlayUser").style.display = "none";
+    document.getElementById("btnStop").style.display = "none";
     
     try {
       const response = await fetch(`${API_URL}?level=${level}&mode=${mode}`, {
@@ -178,6 +200,8 @@
     document.getElementById("wordDisplay").innerText = target.teks;
     document.getElementById("levelBadge").innerText = `Level ${target.level}`;
     document.getElementById("btnPlayUser").style.display = "none";
+    document.getElementById("btnStop").style.display = "none";
+    document.getElementById("btnMic").style.display = "inline-block";
     
     if (currentMode === "mencoba") {
       document.getElementById("btnAudio").style.display = "inline-block";
@@ -206,14 +230,18 @@
     window.speechSynthesis.speak(utterance);
   }
 
-  // Rekam Suara Fisik
+  // Mulai Rekam
   async function mulaiMerekam() {
     if (!recognition) return;
     
+    isEvaluated = false;
     audioChunks = [];
-    document.getElementById("detectedText").innerText = "";
+    document.getElementById("detectedText").style.display = "none";
     document.getElementById("btnPlayUser").style.display = "none";
-    tampilkanStatus("🎙️ Mendengarkan... Silakan baca sekarang!", true);
+    document.getElementById("btnMic").style.display = "none";
+    document.getElementById("btnStop").style.display = "inline-block";
+    
+    tampilkanStatus("🎙️ Mendengarkan... Bicara sekarang!", true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -227,8 +255,17 @@
       mediaRecorder.start();
       recognition.start();
     } catch (err) {
-      tampilkanStatus("❌ Izin mikrofon ditolak!", false);
+      document.getElementById("btnMic").style.display = "inline-block";
+      document.getElementById("btnStop").style.display = "none";
+      tampilkanStatus("❌ Izinkan akses mikrofon di browser!", false);
     }
+  }
+
+  function hentikanMerekamManual() {
+    document.getElementById("btnMic").style.display = "inline-block";
+    document.getElementById("btnStop").style.display = "none";
+    if (recognition) recognition.stop();
+    stopAudioRecording();
   }
 
   function stopAudioRecording() {
@@ -244,33 +281,37 @@
     }
   }
 
-  function evaluasiJawaban(jawabanSuara) {
-    stopAudioRecording();
+  function prosesEvaluasi(jawabanSuara) {
+    if (isEvaluated) return;
+    isEvaluated = true;
     
+    hentikanMerekamManual();
+
     const targetAwal = soalList[currentIndex].teks.toLowerCase().trim();
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    document.getElementById("detectedText").innerText = `Suara terdeteksi: "${jawabanSuara}"`;
+    document.getElementById("detectedText").style.display = "block";
+    document.getElementById("detectedText").innerText = `Suara Masuk: "${jawabanSuara}"`;
 
-    // Cocokkan jawaban atau pemetaan abjad
-    if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih)) {
-      tampilkanStatus("✅ HEBAT! BACAAN BENAR!", true);
-      putarSuaraSistem("Pintar!");
+    // Logika Pemencokan Suara (Inklusi Huruf)
+    if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
+      tampilkanStatus("✅ HEBAT! JAWABAN BENAR!", true);
+      putarSuaraSistem("Hebat!");
 
       setTimeout(() => {
         currentIndex++;
         if (currentIndex < soalList.length) {
           tampilkanSoal();
           document.getElementById("statusText").innerText = "";
-          document.getElementById("detectedText").innerText = "";
+          document.getElementById("detectedText").style.display = "none";
         } else {
           selesaiSatuMode();
         }
-      }, 1800);
+      }, 1500);
 
     } else {
-      tampilkanStatus("❌ SALAH! AYO ULANGI LAGI!", false);
+      tampilkanStatus("❌ SALAH! AYO COBA LAGI!", false);
       
       if (currentMode === "mencoba") {
         setTimeout(() => putarAudioContoh(), 1000);
