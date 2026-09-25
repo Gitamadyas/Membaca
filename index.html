@@ -64,7 +64,6 @@
     .btn-audio { background-color: #ffca28; color: #333; }
     .btn-mic { background-color: #42a5f5; color: #fff; }
     .btn-stop { background-color: #ef5350; color: #fff; display: none; }
-    .btn-next { background-color: #ff7043; color: #fff; display: inline-block; }
     .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
     .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
     .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
@@ -110,10 +109,6 @@
 
   <div id="statusText" class="status-text"></div>
   <div id="detectedText" class="detected-text"></div>
-  
-  <div style="margin-top: 15px;">
-    <button id="btnNextManual" class="btn btn-next" onclick="nextSoalManual()">➡️ Lewati / Soal Berikutnya</button>
-  </div>
 
   <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
   <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()" disabled>🔒 Mode Ujian (Terkunci)</button>
@@ -151,7 +146,7 @@
         document.getElementById("detectedText").style.display = "block";
         document.getElementById("detectedText").innerText = `Terdengar: "${hasilSuara}"`;
         
-        // Evaluasi langsung saat kata/huruf yang cocok terdeteksi
+        // Penilaian otomatis
         evaluasiJawabanRealtime(hasilSuara);
       }
     };
@@ -289,7 +284,7 @@
     }
   }
 
-  // Evaluasi Jawaban Fleksibel & Auto-Next
+  // Evaluasi Otomatis
   function evaluasiJawabanRealtime(jawabanSuara) {
     if (isEvaluated) return;
 
@@ -297,12 +292,12 @@
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    // Pengecekan kecocokan huruf/kata
+    // Pengecekan kecocokan bacaan
     if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
       isEvaluated = true;
       hentikanMerekamManual();
 
-      // Tampilkan Efek Benar & Langsung Next
+      // Jawaban BENAR -> Beri respon & Otomatis Pindah Soal
       const displayBox = document.getElementById("wordDisplay");
       displayBox.classList.add("correct-anim");
       tampilkanStatus("✅ BETUL! PINTAR!", true);
@@ -317,19 +312,18 @@
         } else {
           selesaiSatuMode();
         }
-      }, 1000); // Otomatis Next setelah 1 detik
-    }
-  }
+      }, 1200);
 
-  function nextSoalManual() {
-    hentikanMerekamManual();
-    currentIndex++;
-    if (currentIndex < soalList.length) {
-      tampilkanSoal();
-      document.getElementById("statusText").innerText = "";
-      document.getElementById("detectedText").style.display = "none";
     } else {
-      selesaiSatuMode();
+      // Jawaban SALAH -> Tidak Pindah Soal, Minta Ulang
+      tampilkanStatus("❌ BELUM TEPAT! AYO COBA LAGI!", false);
+      if (currentMode === "mencoba") {
+        setTimeout(() => putarAudioContoh(), 1000);
+      } else {
+        putarSuaraSistem("Belum tepat, ujian diulang!");
+        alert("Ada yang belum tepat! Ujian diulang dari nomor 1.");
+        muatSoal(currentLevel, "ujian");
+      }
     }
   }
 
