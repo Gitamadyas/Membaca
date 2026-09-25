@@ -64,9 +64,22 @@
     .btn-audio { background-color: #ffca28; color: #333; }
     .btn-mic { background-color: #42a5f5; color: #fff; }
     .btn-stop { background-color: #ef5350; color: #fff; display: none; }
+    .btn-skip { background-color: #ff9800; color: #fff; display: none; }
     .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
     .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
     .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
+    
+    input[type="text"] {
+      padding: 12px;
+      font-size: 1.1rem;
+      border: 2px solid #b2ebf2;
+      border-radius: 10px;
+      width: 80%;
+      text-align: center;
+      margin-bottom: 15px;
+      outline: none;
+    }
+    
     .status-text {
       margin-top: 15px;
       font-weight: bold;
@@ -90,33 +103,55 @@
       border-color: #2e7d32 !important;
       transform: scale(1.05);
     }
+    .listening-anim {
+      border-color: #42a5f5 !important;
+      background-color: #e3f2fd !important;
+    }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <div id="levelBadge" class="level-badge">Level 1</div>
-  <div id="modeTitle" class="mode-title">Mode Mencoba</div>
-  
-  <div id="wordDisplay" class="word-display">Memuat...</div>
-
-  <div id="actionArea">
-    <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Dengar Contoh</button>
-    <button id="btnMic" class="btn btn-mic" onclick="mulaiMerekam()">🎙️ Mulai Baca</button>
-    <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Selesai Bicara</button>
-    <button id="btnPlayUser" class="btn btn-play-user" onclick="putarRekamanUser()">🎧 Putar Suara Saya</button>
+  <!-- FORM INPUT NAMA -->
+  <div id="startScreen">
+    <h2 style="color: #00838f;">Selamat Datang! 👋</h2>
+    <p>Masukkan nama kamu untuk mulai bermain:</p>
+    <input type="text" id="inputNama" placeholder="Nama Kamu..." />
+    <br>
+    <button class="btn btn-mic" onclick="mulaiPermainan()">🎮 Mulai Main</button>
   </div>
 
-  <div id="statusText" class="status-text"></div>
-  <div id="detectedText" class="detected-text"></div>
+  <!-- AREA GAMEPLAY -->
+  <div id="gameScreen" style="display: none;">
+    <div id="welcomePlayer" style="font-weight: bold; color: #555; margin-bottom: 5px;"></div>
+    <div id="levelBadge" class="level-badge">Level 1</div>
+    <div id="modeTitle" class="mode-title">Mode Mencoba</div>
+    
+    <div id="wordDisplay" class="word-display">Memuat...</div>
 
-  <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-  <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()" disabled>🔒 Mode Ujian (Terkunci)</button>
+    <div id="actionArea">
+      <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Dengar Contoh</button>
+      <button id="btnMic" class="btn btn-mic" onclick="mulaiMerekam()">🎙️ Mulai Baca</button>
+      <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Berhenti Merekam</button>
+      <button id="btnPlayUser" class="btn btn-play-user" onclick="putarRekamanUser()">🎧 Suara Saya</button>
+    </div>
+
+    <div id="statusText" class="status-text"></div>
+    <div id="detectedText" class="detected-text"></div>
+
+    <div style="margin-top: 10px;">
+      <button id="btnSkip" class="btn btn-skip" onclick="lewatiSoalLevel1()">➡️ Lewati (Khusus Huruf)</button>
+    </div>
+
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+    <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()" disabled>🔒 Mode Ujian (Terkunci)</button>
+  </div>
 </div>
 
 <script>
   const API_URL = "https://script.google.com/macros/s/AKfycbz8WB0yTgZ1-vAO2hjVIAmBotDQ7tZ36TX63IRc-xcaRvkC4x5cXajHHfGs7mjwSCSB1g/exec";
   
+  let namaSiswa = "";
   let currentLevel = 1;
   let currentMode = "mencoba";
   let soalList = [];
@@ -127,14 +162,15 @@
   let userAudioUrl = null;
   let isEvaluated = false;
 
+  // Inisialisasi Deteksi Suara Otomatis
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
   
   if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.lang = 'id-ID';
-    recognition.continuous = true;  // Memaksa deteksi menangkap suara instan
-    recognition.interimResults = true; // Langsung kirim hasil saat suara masuk
+    recognition.continuous = true;     // Terus mendengarkan
+    recognition.interimResults = true; // Tangkap hasil kata secara instan/otomatis
     
     recognition.onresult = function(event) {
       let hasilSuara = '';
@@ -142,28 +178,41 @@
         hasilSuara += event.results[i][0].transcript;
       }
       
+      // Begitu kata terdeteksi via suara, panggil fungsi evaluasi otomatis
       if (hasilSuara.trim() !== "") {
         const teksMasuk = hasilSuara.trim();
         document.getElementById("detectedText").style.display = "block";
         document.getElementById("detectedText").innerText = `Terdengar: "${teksMasuk}"`;
         
-        // Penilaian Otomatis saat itu juga!
-        evaluasiJawaban(teksMasuk);
+        // OTOMATIS COCOKKAN KATA KUNCI BACAAN
+        evaluasiJawabanOtomatis(teksMasuk);
       }
     };
 
     recognition.onerror = function() {
       if (!isEvaluated) {
         hentikanMerekamManual();
-        tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
+        tampilkanStatus("❌ Suara tidak terdeteksi. Coba klik 'Mulai Baca' lagi!", false);
       }
     };
 
     recognition.onend = function() {
       stopAudioRecording();
     };
-  } else {
-    alert("Gunakan Google Chrome di Komputer/HP untuk dukungan deteksi suara!");
+  }
+
+  function mulaiPermainan() {
+    const input = document.getElementById("inputNama").value.trim();
+    if (input === "") {
+      alert("Silakan masukkan nama kamu terlebih dahulu!");
+      return;
+    }
+    namaSiswa = input;
+    document.getElementById("startScreen").style.display = "none";
+    document.getElementById("gameScreen").style.display = "block";
+    document.getElementById("welcomePlayer").innerText = `Halo, ${namaSiswa}! 😊`;
+    
+    muatSoal(currentLevel, "mencoba");
   }
 
   async function muatSoal(level, mode) {
@@ -174,7 +223,7 @@
     document.getElementById("btnStop").style.display = "none";
     
     try {
-      const response = await fetch(`${API_URL}?level=${level}&mode=${mode}`, {
+      const response = await fetch(`${API_URL}?action=getSoal&level=${level}&mode=${mode}`, {
         method: "GET",
         redirect: "follow"
       });
@@ -199,17 +248,22 @@
     if (soalList.length === 0) return;
     
     isEvaluated = false;
-    
     const target = soalList[currentIndex];
     const displayBox = document.getElementById("wordDisplay");
     displayBox.innerText = target.teks;
-    displayBox.classList.remove("correct-anim");
+    displayBox.className = "word-display";
     
     document.getElementById("levelBadge").innerText = `Level ${target.level}`;
     document.getElementById("btnPlayUser").style.display = "none";
     document.getElementById("btnStop").style.display = "none";
     document.getElementById("btnMic").style.display = "inline-block";
     
+    if (currentLevel === 1) {
+      document.getElementById("btnSkip").style.display = "inline-block";
+    } else {
+      document.getElementById("btnSkip").style.display = "none";
+    }
+
     if (currentMode === "mencoba") {
       document.getElementById("btnAudio").style.display = "inline-block";
       document.getElementById("modeTitle").innerText = "Mode Mencoba (Latihan Bebas)";
@@ -247,7 +301,10 @@
     document.getElementById("btnMic").style.display = "none";
     document.getElementById("btnStop").style.display = "inline-block";
     
-    tampilkanStatus("🎙️ Mendengarkan... Bicara sekarang!", true);
+    const displayBox = document.getElementById("wordDisplay");
+    displayBox.classList.add("listening-anim");
+    
+    tampilkanStatus("🎙️ Mendengarkan... Sebutkan kata di atas!", true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -263,6 +320,7 @@
     } catch (err) {
       document.getElementById("btnMic").style.display = "inline-block";
       document.getElementById("btnStop").style.display = "none";
+      displayBox.classList.remove("listening-anim");
       tampilkanStatus("❌ Izinkan akses mikrofon di browser!", false);
     }
   }
@@ -270,6 +328,7 @@
   function hentikanMerekamManual() {
     document.getElementById("btnMic").style.display = "inline-block";
     document.getElementById("btnStop").style.display = "none";
+    document.getElementById("wordDisplay").classList.remove("listening-anim");
     if (recognition) {
       try { recognition.stop(); } catch(e){}
     }
@@ -289,34 +348,42 @@
     }
   }
 
-  // Logika Evaluasi Otomatis & Toleransi Abjad Anak
-  function evaluasiJawaban(jawabanSuara) {
+  function lewatiSoalLevel1() {
+    hentikanMerekamManual();
+    currentIndex++;
+    if (currentIndex < soalList.length) {
+      tampilkanSoal();
+      document.getElementById("statusText").innerText = "";
+      document.getElementById("detectedText").style.display = "none";
+    } else {
+      selesaiSatuMode();
+    }
+  }
+
+  // DETEKSI KATA KUNCI SECARA OTOMATIS VIA SUARA
+  function evaluasiJawabanOtomatis(jawabanSuara) {
     if (isEvaluated) return;
 
     const targetAwal = soalList[currentIndex].teks.toLowerCase().trim();
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    // Pengecekan bacaan (Akurasi Tinggi untuk Abjad Tunggal maupun Kata)
+    // Pengecekan kata kunci
     let isBenar = false;
-    
     if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
       isBenar = true;
-    } else if (targetBersih === 'a' && (jawabanBersih.includes('ah') || jawabanBersih.includes('ha') || jawabanBersih.includes('aa'))) {
-      isBenar = true; // Pemetaan khusus aksen anak pada huruf 'A'
     }
 
     if (isBenar) {
-      isEvaluated = true; // Kunci agar tidak melakukan evaluasi ganda
+      isEvaluated = true; // Kunci agar tidak double-next
       hentikanMerekamManual();
 
-      // Beri tanda visual hijau & Suara Betul
       const displayBox = document.getElementById("wordDisplay");
-      displayBox.classList.add("correct-anim");
+      displayBox.className = "word-display correct-anim";
       tampilkanStatus("✅ BETUL! PINTAR!", true);
       putarSuaraSistem("Betul!");
 
-      // LANGSUNG OTOMATIS LANJUT KE SOAL BERIKUTNYA
+      // OTOMATIS LANJUT KE SOAL BERIKUTNYA
       setTimeout(() => {
         currentIndex++;
         if (currentIndex < soalList.length) {
@@ -329,7 +396,6 @@
       }, 1000);
 
     } else {
-      // Jika salah, tetap di halaman ini!
       tampilkanStatus(`❌ Terdengar "${jawabanSuara}". BELUM TEPAT!`, false);
     }
   }
@@ -341,8 +407,10 @@
       document.getElementById("btnModeUjian").disabled = false;
       document.getElementById("btnModeUjian").innerText = "▶️ Mulai Mode Ujian";
     } else {
+      simpanHasilKeSpreadsheet(currentLevel);
+
       putarSuaraSistem("Selamat, kamu tuntas!");
-      alert(`SELAMAT! Kamu TUNTAS Level ${currentLevel}!`);
+      alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Level ${currentLevel}! Hasil tersimpan di Spreadsheet.`);
       
       if (currentLevel < 8) {
         currentLevel++;
@@ -351,8 +419,19 @@
         document.getElementById("btnModeUjian").innerText = "🔒 Mode Ujian (Terkunci)";
         muatSoal(currentLevel, "mencoba");
       } else {
-        alert("SELAMAT! Kamu telah menuntaskan seluruh Level Game Membaca!");
+        alert(`SELAMAT ${namaSiswa}! Kamu telah menuntaskan seluruh 8 Level Game Membaca!`);
       }
+    }
+  }
+
+  async function simpanHasilKeSpreadsheet(level) {
+    try {
+      await fetch(`${API_URL}?action=saveResult&nama=${encodeURIComponent(namaSiswa)}&level=${level}&status=Tuntas`, {
+        method: "GET",
+        redirect: "follow"
+      });
+    } catch (e) {
+      console.log("Gagal menyimpan hasil:", e);
     }
   }
 
@@ -373,10 +452,6 @@
     utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
   }
-
-  window.onload = function() {
-    muatSoal(currentLevel, "mencoba");
-  };
 </script>
 
 </body>
