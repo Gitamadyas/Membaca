@@ -43,18 +43,18 @@
             margin-bottom: 8px;
         }
         .target-text {
-            font-size: 3rem;
+            font-size: 2.8rem;
             font-weight: bold;
             color: #0288d1;
             margin: 15px 0;
-            min-height: 90px;
+            min-height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 3px dashed #b2ebf2;
             border-radius: 15px;
             background-color: #fafafa;
-            padding: 10px;
+            padding: 12px;
             word-break: break-word;
             transition: all 0.3s ease;
         }
@@ -189,12 +189,12 @@
 </div>
 
 <script>
-  // URL WEB APP GOOGLE APPS SCRIPT
+  // URL GOOGLE APPS SCRIPT
   const API_URL = "https://script.google.com/macros/s/AKfycbw8DKVxjeZBtc59r184OU7X6hwWM1x4kLD3DswPeEXCfVcHsEngtxSt0Phi33zOeTZw/exec";
   
   let namaSiswa = "";
   let currentLevel = 1;
-  let maxUnlockedLevel = 2; // Level 1 dan 2 Terbuka di Awal secara Default
+  let maxUnlockedLevel = 2; // Level 1 dan 2 Terbuka secara Default
   let currentMode = "mencoba";
   let soalList = [];
   let currentIndex = 0;
@@ -320,7 +320,7 @@
       tampilkanSoal();
     } catch (error) {
       document.getElementById("wordDisplay").innerText = "Gagal";
-      tampilkanStatus("Gagal terhubung ke Google Sheets. Pastikan 'Who has access' di Deploy Apps Script disetting 'Anyone'!", false);
+      tampilkanStatus("Gagal terhubung ke Google Sheets.", false);
     }
   }
 
@@ -342,7 +342,7 @@
     if (currentLevel <= 2) {
       document.getElementById("btnSkip").style.display = "inline-block";
     } else {
-      // Level 3 Ke Atas: Sembunyikan Tombol Lanjut (Wajib Lulus Validasi AI)
+      // Level 3 Ke Atas: Sembunyikan Tombol Lanjut (Wajib Validasi AI)
       document.getElementById("btnSkip").style.display = "none";
     }
 
@@ -430,7 +430,6 @@
     }
   }
 
-  // KHUSUS LEVEL 1 & 2: BEBAS LANJUT
   function lewatiSoalTanpaValidasi() {
     hentikanMerekamManual();
     currentIndex++;
@@ -443,7 +442,6 @@
     }
   }
 
-  // VALIDASI AI OTOMATIS (LEVEL 3 KE ATAS)
   function evaluasiJawabanOtomatis(jawabanSuara) {
     if (isEvaluated) return;
 
@@ -495,7 +493,6 @@
     } else {
       simpanHasilKeSpreadsheet(currentLevel);
 
-      // BUKA LEVEL BERIKUTNYA JIKA TUNTAS UJIAN
       if (currentLevel === maxUnlockedLevel && maxUnlockedLevel < 8) {
         maxUnlockedLevel++;
       }
