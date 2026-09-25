@@ -48,6 +48,7 @@
       background-color: #fafafa;
       padding: 15px;
       word-break: break-word;
+      transition: all 0.3s ease;
     }
     .btn {
       padding: 12px 20px;
@@ -63,6 +64,7 @@
     .btn-audio { background-color: #ffca28; color: #333; }
     .btn-mic { background-color: #42a5f5; color: #fff; }
     .btn-stop { background-color: #ef5350; color: #fff; display: none; }
+    .btn-next { background-color: #ff7043; color: #fff; display: inline-block; }
     .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
     .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
     .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
@@ -73,17 +75,22 @@
       font-size: 1.2rem;
     }
     .detected-text {
-      font-size: 1rem;
+      font-size: 0.95rem;
       color: #333;
       margin-top: 8px;
       font-style: italic;
-      background: #f1f8e9;
+      background: #e8f5e9;
       padding: 8px;
       border-radius: 10px;
       display: none;
     }
     .success { color: #2e7d32; }
     .error { color: #c62828; }
+    .correct-anim {
+      background-color: #c8e6c9 !important;
+      border-color: #2e7d32 !important;
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
@@ -104,12 +111,15 @@
   <div id="statusText" class="status-text"></div>
   <div id="detectedText" class="detected-text"></div>
   
+  <div style="margin-top: 15px;">
+    <button id="btnNextManual" class="btn btn-next" onclick="nextSoalManual()">➡️ Lewati / Soal Berikutnya</button>
+  </div>
+
   <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
   <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()" disabled>🔒 Mode Ujian (Terkunci)</button>
 </div>
 
 <script>
-  // API URL Web App Google Apps Script
   const API_URL = "https://script.google.com/macros/s/AKfycbz8WB0yTgZ1-vAO2hjVIAmBotDQ7tZ36TX63IRc-xcaRvkC4x5cXajHHfGs7mjwSCSB1g/exec";
   
   let currentLevel = 1;
@@ -117,13 +127,11 @@
   let soalList = [];
   let currentIndex = 0;
   
-  // Rekaman Suara Audio Physical
   let mediaRecorder;
   let audioChunks = [];
   let userAudioUrl = null;
   let isEvaluated = false;
 
-  // Web Speech Recognition
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
   
@@ -131,28 +139,27 @@
     recognition = new SpeechRecognition();
     recognition.lang = 'id-ID';
     recognition.continuous = false;
-    recognition.interimResults = true; // Tangkap hasil sementara
+    recognition.interimResults = true;
     
     recognition.onresult = function(event) {
-      let hasilSementara = '';
+      let hasilSuara = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        hasilSementara += event.results[i][0].transcript;
+        hasilSuara += event.results[i][0].transcript;
       }
       
-      if (hasilSementara.trim() !== "") {
+      if (hasilSuara.trim() !== "") {
         document.getElementById("detectedText").style.display = "block";
-        document.getElementById("detectedText").innerText = `Terdengar: "${hasilSementara}"`;
-      }
-
-      if (event.results[0].isFinal) {
-        prosesEvaluasi(hasilSementara);
+        document.getElementById("detectedText").innerText = `Terdengar: "${hasilSuara}"`;
+        
+        // Evaluasi langsung saat kata/huruf yang cocok terdeteksi
+        evaluasiJawabanRealtime(hasilSuara);
       }
     };
 
-    recognition.onerror = function(e) {
+    recognition.onerror = function() {
       if (!isEvaluated) {
         hentikanMerekamManual();
-        tampilkanStatus("❌ Suara tidak terdeteksi. Klik 'Mulai Baca' lalu ucapkan dengan jelas!", false);
+        tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
       }
     };
 
@@ -160,10 +167,9 @@
       stopAudioRecording();
     };
   } else {
-    alert("Gunakan Google Chrome untuk dukungan penuh deteksi suara!");
+    alert("Gunakan Google Chrome untuk dukungan deteksi suara!");
   }
 
-  // Ambil Data dari Sheets
   async function muatSoal(level, mode) {
     document.getElementById("wordDisplay").innerText = "Memuat...";
     document.getElementById("statusText").innerText = "";
@@ -197,7 +203,10 @@
     if (soalList.length === 0) return;
     
     const target = soalList[currentIndex];
-    document.getElementById("wordDisplay").innerText = target.teks;
+    const displayBox = document.getElementById("wordDisplay");
+    displayBox.innerText = target.teks;
+    displayBox.classList.remove("correct-anim");
+    
     document.getElementById("levelBadge").innerText = `Level ${target.level}`;
     document.getElementById("btnPlayUser").style.display = "none";
     document.getElementById("btnStop").style.display = "none";
@@ -230,7 +239,6 @@
     window.speechSynthesis.speak(utterance);
   }
 
-  // Mulai Rekam
   async function mulaiMerekam() {
     if (!recognition) return;
     
@@ -281,23 +289,24 @@
     }
   }
 
-  function prosesEvaluasi(jawabanSuara) {
+  // Evaluasi Jawaban Fleksibel & Auto-Next
+  function evaluasiJawabanRealtime(jawabanSuara) {
     if (isEvaluated) return;
-    isEvaluated = true;
-    
-    hentikanMerekamManual();
 
     const targetAwal = soalList[currentIndex].teks.toLowerCase().trim();
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    document.getElementById("detectedText").style.display = "block";
-    document.getElementById("detectedText").innerText = `Suara Masuk: "${jawabanSuara}"`;
-
-    // Logika Pemencokan Suara (Inklusi Huruf)
+    // Pengecekan kecocokan huruf/kata
     if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
-      tampilkanStatus("✅ HEBAT! JAWABAN BENAR!", true);
-      putarSuaraSistem("Hebat!");
+      isEvaluated = true;
+      hentikanMerekamManual();
+
+      // Tampilkan Efek Benar & Langsung Next
+      const displayBox = document.getElementById("wordDisplay");
+      displayBox.classList.add("correct-anim");
+      tampilkanStatus("✅ BETUL! PINTAR!", true);
+      putarSuaraSistem("Betul!");
 
       setTimeout(() => {
         currentIndex++;
@@ -308,25 +317,26 @@
         } else {
           selesaiSatuMode();
         }
-      }, 1500);
+      }, 1000); // Otomatis Next setelah 1 detik
+    }
+  }
 
+  function nextSoalManual() {
+    hentikanMerekamManual();
+    currentIndex++;
+    if (currentIndex < soalList.length) {
+      tampilkanSoal();
+      document.getElementById("statusText").innerText = "";
+      document.getElementById("detectedText").style.display = "none";
     } else {
-      tampilkanStatus("❌ SALAH! AYO COBA LAGI!", false);
-      
-      if (currentMode === "mencoba") {
-        setTimeout(() => putarAudioContoh(), 1000);
-      } else {
-        putarSuaraSistem("Belum tepat, ujian diulang!");
-        alert("Ada yang belum tepat! Ujian diulang dari nomor 1.");
-        muatSoal(currentLevel, "ujian");
-      }
+      selesaiSatuMode();
     }
   }
 
   function selesaiSatuMode() {
     if (currentMode === "mencoba") {
       putarSuaraSistem("Luar biasa! Mode Ujian terbuka!");
-      tampilkanStatus("🎉 Latihan Selesai! Klik tombol Mode Ujian di bawah.", true);
+      tampilkanStatus("🎉 Latihan Selesai! Klik Mode Ujian di bawah.", true);
       document.getElementById("btnModeUjian").disabled = false;
       document.getElementById("btnModeUjian").innerText = "▶️ Mulai Mode Ujian";
     } else {
@@ -359,7 +369,7 @@
   function putarSuaraSistem(teks) {
     const utterance = new SpeechSynthesisUtterance(teks);
     utterance.lang = 'id-ID';
-    utterance.rate = 0.9;
+    utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
   }
 
