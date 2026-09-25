@@ -21,13 +21,13 @@
             max-width: 500px;
             width: 90%;
             background: white;
-            padding: 30px;
+            padding: 25px;
             border-radius: 20px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.1);
             border: 4px solid #4fc3f7;
         }
         .level-badge {
-            font-size: 20px;
+            font-size: 18px;
             background: #ffb74d;
             color: white;
             padding: 5px 15px;
@@ -39,42 +39,43 @@
             font-size: 1rem;
             color: #00838f;
             font-weight: bold;
-            margin-top: 10px;
-            margin-bottom: 10px;
+            margin-top: 8px;
+            margin-bottom: 8px;
         }
         .target-text {
-            font-size: 3.2rem;
+            font-size: 3rem;
             font-weight: bold;
             color: #0288d1;
-            margin: 20px 0;
-            min-height: 100px;
+            margin: 15px 0;
+            min-height: 90px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 3px dashed #b2ebf2;
             border-radius: 15px;
             background-color: #fafafa;
-            padding: 15px;
+            padding: 10px;
             word-break: break-word;
             transition: all 0.3s ease;
         }
         .btn {
-            padding: 12px 20px;
-            font-size: 1rem;
+            padding: 10px 18px;
+            font-size: 0.95rem;
             font-weight: bold;
             border: none;
             border-radius: 50px;
             cursor: pointer;
-            margin: 5px;
+            margin: 4px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: 0.2s;
         }
         .btn-audio { background-color: #ffca28; color: #333; }
         .btn-mic { background-color: #42a5f5; color: #fff; }
         .btn-stop { background-color: #ef5350; color: #fff; display: none; }
-        .btn-skip { background-color: #ff9800; color: #fff; width: 100%; margin-top: 10px; font-size: 1.1rem; }
+        .btn-skip { background-color: #ff9800; color: #fff; width: 100%; margin-top: 10px; font-size: 1rem; }
         .btn-play-user { background-color: #66bb6a; color: #fff; display: none; }
-        .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 15px; }
+        .btn-mode { background-color: #ab47bc; color: #fff; width: 100%; margin-top: 10px; }
+        .btn-back { background-color: #78909c; color: #fff; width: 100%; margin-top: 15px; }
         .btn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
         
         input[type="text"] {
@@ -88,20 +89,42 @@
             outline: none;
         }
         
-        .status-text {
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
             margin-top: 15px;
+        }
+        .level-card {
+            background: #e1f5fe;
+            border: 2px solid #81d4fa;
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
             font-weight: bold;
-            min-height: 28px;
-            font-size: 1.2rem;
+            transition: 0.2s;
+        }
+        .level-card.locked {
+            background: #eee;
+            border-color: #ccc;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        .status-text {
+            margin-top: 10px;
+            font-weight: bold;
+            min-height: 24px;
+            font-size: 1.1rem;
         }
         .detected-text {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             color: #333;
-            margin-top: 8px;
+            margin-top: 5px;
             font-style: italic;
             background: #e8f5e9;
-            padding: 8px;
-            border-radius: 10px;
+            padding: 6px;
+            border-radius: 8px;
             display: none;
         }
         .success { color: #2e7d32; }
@@ -120,7 +143,7 @@
 <body>
 
 <div class="game-container">
-  <!-- FORM INPUT NAMA -->
+  <!-- TAMPILAN 1: FORM INPUT NAMA -->
   <div id="startScreen">
     <h2 style="color: #00838f;">Selamat Datang! 👋</h2>
     <p>Masukkan nama kamu untuk mulai petualangan membaca:</p>
@@ -129,38 +152,49 @@
     <button class="btn btn-mic" onclick="mulaiPermainan()">🎮 Mulai Main</button>
   </div>
 
-  <!-- AREA GAMEPLAY -->
+  <!-- TAMPILAN 2: PETA PILIHAN LEVEL 1-8 -->
+  <div id="levelMapScreen" style="display: none;">
+    <h3 id="playerGreeting" style="color: #00838f; margin: 0;"></h3>
+    <p style="font-size: 0.9rem; color: #666;">Pilih Level Membaca Kamu:</p>
+    
+    <div class="level-grid" id="levelGrid">
+      <!-- Level 1-8 digenerate otomatis -->
+    </div>
+  </div>
+
+  <!-- TAMPILAN 3: AREA GAMEPLAY -->
   <div id="gameScreen" style="display: none;">
-    <div id="welcomePlayer" style="font-weight: bold; color: #555; margin-bottom: 5px;"></div>
     <div id="levelBadge" class="level-badge">Level 1</div>
     <div id="modeTitle" class="mode-title">Mode Mencoba</div>
     
     <div id="wordDisplay" class="target-text">Memuat...</div>
 
     <div id="actionArea">
-      <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Dengar Contoh</button>
+      <button id="btnAudio" class="btn btn-audio" onclick="putarAudioContoh()">🔊 Contoh</button>
       <button id="btnMic" class="btn btn-mic" onclick="mulaiMerekam()">🎙️ Mulai Baca</button>
-      <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Berhenti Merekam</button>
+      <button id="btnStop" class="btn btn-stop" onclick="hentikanMerekamManual()">🛑 Berhenti</button>
       <button id="btnPlayUser" class="btn btn-play-user" onclick="putarRekamanUser()">🎧 Suara Saya</button>
     </div>
 
     <div id="statusText" class="status-text"></div>
     <div id="detectedText" class="detected-text"></div>
 
-    <div style="margin-top: 10px;">
+    <div>
       <button id="btnSkip" class="btn btn-skip" onclick="lewatiSoalTanpaValidasi()">➡️ Lanjut Ke Soal Berikutnya</button>
     </div>
 
-    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-    <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()" disabled>🔒 Mode Ujian (Terkunci)</button>
+    <button id="btnModeUjian" class="btn btn-mode" onclick="pindahKeUjian()">▶️ Mulai Mode Ujian</button>
+    <button class="btn btn-back" onclick="kembaliKePetaLevel()">⬅️ Kembali Pilih Level</button>
   </div>
 </div>
 
 <script>
+  // URL WEB APP GOOGLE APPS SCRIPT
   const API_URL = "https://script.google.com/macros/s/AKfycbz8WB0yTgZ1-vAO2hjVIAmBotDQ7tZ36TX63IRc-xcaRvkC4x5cXajHHfGs7mjwSCSB1g/exec";
   
   let namaSiswa = "";
   let currentLevel = 1;
+  let maxUnlockedLevel = 2; // Level 1 dan 2 Terbuka di Awal secara Default
   let currentMode = "mencoba";
   let soalList = [];
   let currentIndex = 0;
@@ -170,7 +204,6 @@
   let userAudioUrl = null;
   let isEvaluated = false;
 
-  // AI Voice Recognition Engine (Native Web Speech API)
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
   
@@ -191,14 +224,11 @@
         document.getElementById("detectedText").style.display = "block";
         document.getElementById("detectedText").innerText = `Terdengar: "${teksMasuk}"`;
         
-        // Cek Panjang Huruf Soal Saat Ini
-        const targetTeks = soalList[currentIndex].teks.replace(/[^a-zA-Z0-9]/g, "");
-        
-        // HANYA VALIDASI JIKA PANJANG TEKS > 2 HURUF (3 Huruf Ke Atas)
-        if (targetTeks.length > 2) {
+        // HANYA VALIDASI OTOMATIS JIKA SOAL DI LEVEL 3 KE ATAS
+        if (currentLevel >= 3) {
           evaluasiJawabanOtomatis(teksMasuk);
         } else {
-          tampilkanStatus("ℹ️ Pembacaan dicatat. Klik 'Lanjut Ke Soal Berikutnya' jika sudah selesai.", true);
+          tampilkanStatus("ℹ️ Suara terekam. Klik 'Lanjut Ke Soal Berikutnya' jika sudah selesai.", true);
         }
       }
     };
@@ -206,15 +236,13 @@
     recognition.onerror = function() {
       if (!isEvaluated) {
         hentikanMerekamManual();
-        tampilkanStatus("❌ Suara tidak terdeteksi jelas. Coba klik 'Mulai Baca' lagi!", false);
+        tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
       }
     };
 
     recognition.onend = function() {
       stopAudioRecording();
     };
-  } else {
-    alert("Gunakan Google Chrome untuk dukungan penuh AI Suara!");
   }
 
   function mulaiPermainan() {
@@ -225,10 +253,46 @@
     }
     namaSiswa = input;
     document.getElementById("startScreen").style.display = "none";
+    document.getElementById("levelMapScreen").style.display = "block";
+    document.getElementById("playerGreeting").innerText = `Halo, ${namaSiswa}! 😊`;
+    
+    renderPetaLevel();
+  }
+
+  function renderPetaLevel() {
+    const grid = document.getElementById("levelGrid");
+    grid.innerHTML = "";
+    
+    for (let i = 1; i <= 8; i++) {
+      const isUnlocked = i <= maxUnlockedLevel;
+      const card = document.createElement("div");
+      card.className = `level-card ${isUnlocked ? '' : 'locked'}`;
+      card.innerHTML = `
+        <div>Level ${i}</div>
+        <div style="font-size: 0.8rem;">${isUnlocked ? '🔓 Terbuka' : '🔒 Terkunci'}</div>
+      `;
+      
+      if (isUnlocked) {
+        card.onclick = () => pilihLevel(i);
+      }
+      grid.appendChild(card);
+    }
+  }
+
+  function pilihLevel(lvl) {
+    currentLevel = lvl;
+    currentMode = "mencoba";
+    document.getElementById("levelMapScreen").style.display = "none";
     document.getElementById("gameScreen").style.display = "block";
-    document.getElementById("welcomePlayer").innerText = `Halo, ${namaSiswa}! 😊`;
     
     muatSoal(currentLevel, "mencoba");
+  }
+
+  function kembaliKePetaLevel() {
+    hentikanMerekamManual();
+    document.getElementById("gameScreen").style.display = "none";
+    document.getElementById("levelMapScreen").style.display = "block";
+    renderPetaLevel();
   }
 
   async function muatSoal(level, mode) {
@@ -248,7 +312,7 @@
       
       if (!soalList || soalList.length === 0 || soalList.error) {
         document.getElementById("wordDisplay").innerText = "Kosong";
-        tampilkanStatus(`Soal Level ${level} belum ada di BankSoal!`, false);
+        tampilkanStatus(`Soal Level ${level} belum ada di Sheet BankSoal!`, false);
         return;
       }
       
@@ -256,7 +320,7 @@
       tampilkanSoal();
     } catch (error) {
       document.getElementById("wordDisplay").innerText = "Gagal";
-      tampilkanStatus("Gagal terhubung ke Google Sheets.", false);
+      tampilkanStatus("Gagal terhubung ke Google Sheets. Pastikan 'Who has access' di Deploy Apps Script disetting 'Anyone'!", false);
     }
   }
 
@@ -274,14 +338,11 @@
     document.getElementById("btnStop").style.display = "none";
     document.getElementById("btnMic").style.display = "inline-block";
     
-    // HITUNG PANJANG HURUF PADA SOAL
-    const panjangHuruf = target.teks.replace(/[^a-zA-Z0-9]/g, "").length;
-    
-    // 1 Huruf & 2 Huruf: Tampilkan Tombol Lanjut Bebas (Tanpa Wajib Validasi Suara)
-    if (panjangHuruf <= 2) {
+    // Level 1 & 2: Munculkan Tombol Lanjut Bebas
+    if (currentLevel <= 2) {
       document.getElementById("btnSkip").style.display = "inline-block";
     } else {
-      // 3 Huruf Ke Atas: Sembunyikan Tombol Lanjut (Wajib Lulus AI Validasi)
+      // Level 3 Ke Atas: Sembunyikan Tombol Lanjut (Wajib Lulus Validasi AI)
       document.getElementById("btnSkip").style.display = "none";
     }
 
@@ -325,7 +386,7 @@
     const displayBox = document.getElementById("wordDisplay");
     displayBox.classList.add("listening-anim");
     
-    tampilkanStatus("🎙️ Mendengarkan... Ucapkan kata di atas!", true);
+    tampilkanStatus("🎙️ Mendengarkan... Sebutkan kata di atas!", true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -369,7 +430,7 @@
     }
   }
 
-  // KHUSUS 1 DAN 2 HURUF: DAPAT DILEWATI LANGSUNG
+  // KHUSUS LEVEL 1 & 2: BEBAS LANJUT
   function lewatiSoalTanpaValidasi() {
     hentikanMerekamManual();
     currentIndex++;
@@ -382,7 +443,7 @@
     }
   }
 
-  // VALIDASI AI OTOMATIS (KHUSUS 3 HURUF KE ATAS)
+  // VALIDASI AI OTOMATIS (LEVEL 3 KE ATAS)
   function evaluasiJawabanOtomatis(jawabanSuara) {
     if (isEvaluated) return;
 
@@ -390,7 +451,6 @@
     const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
     const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    // Cek kecocokan pembacaan
     let isBenar = false;
     if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
       isBenar = true;
@@ -405,7 +465,6 @@
       tampilkanStatus("✅ BETUL! PINTAR!", true);
       putarSuaraSistem("Betul!");
 
-      // OTOMATIS PINDAH SOAL SAAT JAWABAN BENAR
       setTimeout(() => {
         currentIndex++;
         if (currentIndex < soalList.length) {
@@ -418,10 +477,7 @@
       }, 1000);
 
     } else {
-      // Pembacaan Salah: Tidak Pindah Soal
-      tampilkanStatus(`❌ Terdengar "${jawabanSuara}". BELUM TEPAT, AYO ULANGI!`, false);
-      
-      // Jika di Mode Ujian, Reset Ujian dari Soal Ke-1
+      tampilkanStatus(`❌ Terdengar "${jawabanSuara}". BELUM TEPAT, ULANGI!`, false);
       if (currentMode === "ujian") {
         isEvaluated = true;
         hentikanMerekamManual();
@@ -436,23 +492,17 @@
     if (currentMode === "mencoba") {
       putarSuaraSistem("Luar biasa! Mode Ujian terbuka!");
       tampilkanStatus("🎉 Latihan Selesai! Klik Mode Ujian di bawah.", true);
-      document.getElementById("btnModeUjian").disabled = false;
-      document.getElementById("btnModeUjian").innerText = "▶️ Mulai Mode Ujian";
     } else {
       simpanHasilKeSpreadsheet(currentLevel);
 
-      putarSuaraSistem("Selamat, kamu tuntas!");
-      alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Level ${currentLevel}! Hasil tersimpan di Spreadsheet.`);
-      
-      if (currentLevel < 8) {
-        currentLevel++;
-        currentMode = "mencoba";
-        document.getElementById("btnModeUjian").disabled = true;
-        document.getElementById("btnModeUjian").innerText = "🔒 Mode Ujian (Terkunci)";
-        muatSoal(currentLevel, "mencoba");
-      } else {
-        alert(`SELAMAT ${namaSiswa}! Kamu telah menuntaskan seluruh 8 Level Game Membaca!`);
+      // BUKA LEVEL BERIKUTNYA JIKA TUNTAS UJIAN
+      if (currentLevel === maxUnlockedLevel && maxUnlockedLevel < 8) {
+        maxUnlockedLevel++;
       }
+
+      putarSuaraSistem("Selamat, kamu tuntas!");
+      alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Ujian Level ${currentLevel}! Level berikutnya telah terbuka.`);
+      kembaliKePetaLevel();
     }
   }
 
