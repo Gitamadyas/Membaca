@@ -43,11 +43,11 @@
             margin-bottom: 8px;
         }
         .target-text {
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             font-weight: bold;
             color: #0288d1;
             margin: 15px 0;
-            min-height: 100px;
+            min-height: 110px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -189,12 +189,12 @@
 </div>
 
 <script>
-  // URL GOOGLE APPS SCRIPT
+  // URL WEB APP GOOGLE APPS SCRIPT
   const API_URL = "https://script.google.com/macros/s/AKfycbw8DKVxjeZBtc59r184OU7X6hwWM1x4kLD3DswPeEXCfVcHsEngtxSt0Phi33zOeTZw/exec";
   
   let namaSiswa = "";
   let currentLevel = 1;
-  let maxUnlockedLevel = 3; // LEVEL 1, 2, DAN 3 TERBUKA DI AWAL SECARA DEFAULT
+  let maxUnlockedLevel = 3; // LEVEL 1, 2, DAN 3 OTOMATIS TERBUKA DI AWAL
   let currentMode = "mencoba";
   let soalList = [];
   let currentIndex = 0;
@@ -386,7 +386,7 @@
     const displayBox = document.getElementById("wordDisplay");
     displayBox.classList.add("listening-anim");
     
-    tampilkanStatus("🎙️ Mendengarkan... Sebutkan kata di atas!", true);
+    tampilkanStatus("🎙️ Mendengarkan... Ucapkan kata di atas!", true);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -493,12 +493,17 @@
     } else {
       simpanHasilKeSpreadsheet(currentLevel);
 
+      // MEMBUKA LEVEL BERIKUTNYA JIKA TUNTAS UJIAN
       if (currentLevel === maxUnlockedLevel && maxUnlockedLevel < 8) {
         maxUnlockedLevel++;
       }
 
       putarSuaraSistem("Selamat, kamu tuntas!");
-      alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Ujian Level ${currentLevel}! Level berikutnya telah terbuka.`);
+      if (currentLevel === 8) {
+        alert(`🎉 SELAMAT ${namaSiswa}! Kamu telah menuntaskan seluruh 8 Level Game Membaca!`);
+      } else {
+        alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Ujian Level ${currentLevel}! Level ${currentLevel + 1} telah terbuka.`);
+      }
       kembaliKePetaLevel();
     }
   }
