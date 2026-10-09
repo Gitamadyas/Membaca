@@ -149,7 +149,7 @@
     <p>Masukkan nama kamu untuk mulai petualangan membaca:</p>
     <input type="text" id="inputNama" placeholder="Nama Kamu..." />
     <br>
-    <button class="btn btn-mic" onclick="mulaiPermainan()">🎮 Mulai Main</button>
+    <button type="button" class="btn btn-mic" onclick="mulaiPermainan()">🎮 Mulai Main</button>
   </div>
 
   <!-- TAMPILAN 2: PETA PILIHAN LEVEL 1-8 -->
@@ -205,44 +205,48 @@
   let isEvaluated = false;
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition;
-  
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'id-ID';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    
-    recognition.onresult = function(event) {
-      let hasilSuara = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        hasilSuara += event.results[i][0].transcript;
-      }
+  let recognition = null;
+
+  function inisialisasiSpeechRecognition() {
+    if (!SpeechRecognition) return;
+    try {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'id-ID';
+      recognition.continuous = true;
+      recognition.interimResults = true;
       
-      if (hasilSuara.trim() !== "") {
-        const teksMasuk = hasilSuara.trim();
-        document.getElementById("detectedText").style.display = "block";
-        document.getElementById("detectedText").innerText = `Terdengar: "${teksMasuk}"`;
-        
-        // HANYA VALIDASI OTOMATIS JIKA SOAL DI LEVEL 3 KE ATAS
-        if (currentLevel >= 3) {
-          evaluasiJawabanOtomatis(teksMasuk);
-        } else {
-          tampilkanStatus("ℹ️ Suara terekam. Klik 'Lanjut Ke Soal Berikutnya' jika sudah selesai.", true);
+      recognition.onresult = function(event) {
+        let hasilSuara = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          hasilSuara += event.results[i][0].transcript;
         }
-      }
-    };
+        
+        if (hasilSuara.trim() !== "") {
+          const teksMasuk = hasilSuara.trim();
+          document.getElementById("detectedText").style.display = "block";
+          document.getElementById("detectedText").innerText = `Terdengar: "${teksMasuk}"`;
+          
+          if (currentLevel >= 3) {
+            evaluasiJawabanOtomatis(teksMasuk);
+          } else {
+            tampilkanStatus("ℹ️ Suara terekam. Klik 'Lanjut Ke Soal Berikutnya' jika sudah selesai.", true);
+          }
+        }
+      };
 
-    recognition.onerror = function() {
-      if (!isEvaluated) {
-        hentikanMerekamManual();
-        tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
-      }
-    };
+      recognition.onerror = function() {
+        if (!isEvaluated) {
+          hentikanMerekamManual();
+          tampilkanStatus("❌ Suara tidak terdeteksi. Coba 'Mulai Baca' lagi!", false);
+        }
+      };
 
-    recognition.onend = function() {
-      stopAudioRecording();
-    };
+      recognition.onend = function() {
+        stopAudioRecording();
+      };
+    } catch(e) {
+      console.log("Speech Recognition error:", e);
+    }
   }
 
   function mulaiPermainan() {
@@ -256,6 +260,7 @@
     document.getElementById("levelMapScreen").style.display = "block";
     document.getElementById("playerGreeting").innerText = `Halo, ${namaSiswa}! 😊`;
     
+    inisialisasiSpeechRecognition();
     renderPetaLevel();
   }
 
@@ -318,4 +323,220 @@
       
       currentIndex = 0;
       tampilkanSoal();
-    } catch (error
+    } catch (error) {
+      document.getElementById("wordDisplay").innerText = "Gagal";
+      tampilkanStatus("Gagal terhubung ke Google Sheets.", false);
+    }
+  }
+
+  function tampilkanSoal() {
+    if (soalList.length === 0) return;
+    
+    isEvaluated = false;
+    const target = soalList[currentIndex];
+    const displayBox = document.getElementById("wordDisplay");
+    displayBox.innerText = target.teks;
+    displayBox.className = "target-text";
+    
+    document.getElementById("levelBadge").innerText = `Level ${target.level}`;
+    document.getElementById("btnPlayUser").style.display = "none";
+    document.getElementById("btnStop").style.display = "none";
+    document.getElementById("btnMic").style.display = "inline-block";
+    
+    if (currentLevel <= 2) {
+      document.getElementById("btnSkip").style.display = "inline-block";
+    } else {
+      document.getElementById("btnSkip").style.display = "none";
+    }
+
+    if (currentMode === "mencoba") {
+      document.getElementById("btnAudio").style.display = "inline-block";
+      document.getElementById("modeTitle").innerText = "Mode Mencoba (Latihan Bebas)";
+    } else {
+      document.getElementById("btnAudio").style.display = "none";
+      document.getElementById("modeTitle").innerText = "Mode Ujian (Tes Ketuntasan 100%)";
+    }
+  }
+
+  function putarAudioContoh() {
+    const audioUrl = soalList[currentIndex].audioContoh;
+    if (audioUrl && audioUrl.startsWith("http")) {
+      const audio = new Audio(audioUrl);
+      audio.play().catch(() => fallbackTextToSpeech());
+    } else {
+      fallbackTextToSpeech();
+    }
+  }
+
+  function fallbackTextToSpeech() {
+    const teksBersih = soalList[currentIndex].teks.replace(/-/g, "");
+    const utterance = new SpeechSynthesisUtterance(teksBersih);
+    utterance.lang = 'id-ID';
+    utterance.rate = 0.8;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function mulaiMerekam() {
+    isEvaluated = false;
+    audioChunks = [];
+    document.getElementById("detectedText").style.display = "none";
+    document.getElementById("btnPlayUser").style.display = "none";
+    document.getElementById("btnMic").style.display = "none";
+    document.getElementById("btnStop").style.display = "inline-block";
+    
+    const displayBox = document.getElementById("wordDisplay");
+    displayBox.classList.add("listening-anim");
+    
+    tampilkanStatus("🎙️ Mendengarkan... Ucapkan kata di atas!", true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        userAudioUrl = URL.createObjectURL(audioBlob);
+        document.getElementById("btnPlayUser").style.display = "inline-block";
+      };
+      mediaRecorder.start();
+      if (recognition) recognition.start();
+    } catch (err) {
+      document.getElementById("btnMic").style.display = "inline-block";
+      document.getElementById("btnStop").style.display = "none";
+      displayBox.classList.remove("listening-anim");
+      tampilkanStatus("❌ Izinkan akses mikrofon di browser!", false);
+    }
+  }
+
+  function hentikanMerekamManual() {
+    document.getElementById("btnMic").style.display = "inline-block";
+    document.getElementById("btnStop").style.display = "none";
+    document.getElementById("wordDisplay").classList.remove("listening-anim");
+    if (recognition) {
+      try { recognition.stop(); } catch(e){}
+    }
+    stopAudioRecording();
+  }
+
+  function stopAudioRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  }
+
+  function putarRekamanUser() {
+    if (userAudioUrl) {
+      const audio = new Audio(userAudioUrl);
+      audio.play();
+    }
+  }
+
+  function lewatiSoalTanpaValidasi() {
+    hentikanMerekamManual();
+    currentIndex++;
+    if (currentIndex < soalList.length) {
+      tampilkanSoal();
+      document.getElementById("statusText").innerText = "";
+      document.getElementById("detectedText").style.display = "none";
+    } else {
+      selesaiSatuMode();
+    }
+  }
+
+  function evaluasiJawabanOtomatis(jawabanSuara) {
+    if (isEvaluated) return;
+
+    const targetAwal = soalList[currentIndex].teks.toLowerCase().trim();
+    const targetBersih = targetAwal.replace(/[^a-z0-9]/g, "");
+    const jawabanBersih = jawabanSuara.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    let isBenar = false;
+    if (jawabanBersih === targetBersih || jawabanBersih.includes(targetBersih) || targetBersih.includes(jawabanBersih)) {
+      isBenar = true;
+    }
+
+    if (isBenar) {
+      isEvaluated = true;
+      hentikanMerekamManual();
+
+      const displayBox = document.getElementById("wordDisplay");
+      displayBox.className = "target-text correct-anim";
+      tampilkanStatus("✅ BETUL! PINTAR!", true);
+      putarSuaraSistem("Betul!");
+
+      setTimeout(() => {
+        currentIndex++;
+        if (currentIndex < soalList.length) {
+          tampilkanSoal();
+          document.getElementById("statusText").innerText = "";
+          document.getElementById("detectedText").style.display = "none";
+        } else {
+          selesaiSatuMode();
+        }
+      }, 1000);
+
+    } else {
+      tampilkanStatus(`❌ Terdengar "${jawabanSuara}". BELUM TEPAT, ULANGI!`, false);
+      if (currentMode === "ujian") {
+        isEvaluated = true;
+        hentikanMerekamManual();
+        putarSuaraSistem("Belum tepat, ujian diulang dari nomor satu!");
+        alert("Pembacaan belum tepat! Ujian diulang dari nomor 1.");
+        muatSoal(currentLevel, "ujian");
+      }
+    }
+  }
+
+  function selesaiSatuMode() {
+    if (currentMode === "mencoba") {
+      putarSuaraSistem("Luar biasa! Mode Ujian terbuka!");
+      tampilkanStatus("🎉 Latihan Selesai! Klik Mode Ujian di bawah.", true);
+    } else {
+      simpanHasilKeSpreadsheet(currentLevel);
+
+      if (currentLevel === maxUnlockedLevel && maxUnlockedLevel < 8) {
+        maxUnlockedLevel++;
+      }
+
+      putarSuaraSistem("Selamat, kamu tuntas!");
+      if (currentLevel === 8) {
+        alert(`🎉 SELAMAT ${namaSiswa}! Kamu telah menuntaskan seluruh 8 Level Game Membaca!`);
+      } else {
+        alert(`SELAMAT ${namaSiswa}! Kamu TUNTAS Ujian Level ${currentLevel}! Level ${currentLevel + 1} telah terbuka.`);
+      }
+      kembaliKePetaLevel();
+    }
+  }
+
+  async function simpanHasilKeSpreadsheet(level) {
+    try {
+      await fetch(`${API_URL}?action=saveResult&nama=${encodeURIComponent(namaSiswa)}&level=${level}&status=Tuntas`, {
+        method: "GET",
+        redirect: "follow"
+      });
+    } catch (e) {
+      console.log("Gagal menyimpan hasil:", e);
+    }
+  }
+
+  function pindahKeUjian() {
+    currentMode = "ujian";
+    muatSoal(currentLevel, "ujian");
+  }
+
+  function tampilkanStatus(pesan, isSuccess) {
+    const el = document.getElementById("statusText");
+    el.innerText = pesan;
+    el.className = "status-text " + (isSuccess ? "success" : "error");
+  }
+
+  function putarSuaraSistem(teks) {
+    const utterance = new SpeechSynthesisUtterance(teks);
+    utterance.lang = 'id-ID';
+    utterance.rate = 1.0;
+    window.speechSynthesis.speak(utterance);
+  }
+</script>
+
+</body>
+</html>
